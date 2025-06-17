@@ -5,11 +5,15 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import pytz
 
-load_dotenv()  # Carga variables desde .env
+# Carga variables de entorno
+load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_IDS = [int(os.getenv("ADMIN_ID"))]
+admin_ids_env = os.getenv("ADMIN_ID", "")
+# Permite múltiples admin separados por coma, o solo uno
+ADMIN_IDS = [int(i.strip()) for i in admin_ids_env.split(",") if i.strip().isdigit()]
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -42,15 +46,43 @@ async def crear(update: Update, context: ContextTypes.DEFAULT_TYPE):
         password = args[1]
         dias = int(args[2])
         conexiones = int(args[3])
-        fecha_expiracion = (datetime.now() + timedelta(days=dias)).strftime("%Y-%m-%d")
 
-        # Crear usuario SSH en el sistema
-        subprocess.run(["useradd", "-e", fecha_expiracion, "-M", "-s", "/bin/false", usuario])
-        subprocess.run(f"echo '{usuario}:{password}' | chpasswd", shell=True)
-        subprocess.run(f"echo 'MaxSessions {conexiones}' >> /etc/ssh/sshd_config", shell=True)
+        tz = pytz.timezone('America/Guatemala')
+        fecha_expiracion = (datetime.now(tz) + timedelta(days=dias)).strftime("%Y-%m-%d")
+
+        # Crear usuario SSH
+        resultado_useradd = subprocess.run(
+            ["useradd", "-e", fecha_expiracion, "-M", "-s", "/bin/false", usuario],
+            capture_output=True, text=True
+        )
+        if resultado_useradd.returncode != 0:
+            raise Exception(f"useradd error: {resultado_useradd.stderr.strip()}")
+
+        resultado_chpasswd = subprocess.run(
+            f"echo '{usuario}:{password}' | chpasswd", shell=True,
+            capture_output=True, text=True
+        )
+        if resultado_chpasswd.returncode != 0:
+            raise Exception(f"chpasswd error: {resultado_chpasswd.stderr.strip()}")
+
+        # Añadir MaxSessions si no existe para evitar duplicados
+        with open("/etc/ssh/sshd_config", "r") as f:
+            sshd_conf = f.read()
+
+        maxsessions_line = f"MaxSessions {conexiones}"
+        if maxsessions_line not in sshd_conf:
+            with open("/etc/ssh/sshd_config", "a") as f:
+                f.write(f"\n{maxsessions_line}\n")
+
+            # Recargar sshd para aplicar cambios
+            subprocess.run(["systemctl", "reload", "sshd"])
 
         await update.message.reply_text(
-            f"✅ Usuario SSH creado:\n\n👤 Usuario: `{usuario}`\n🔑 Contraseña: `{password}`\n📅 Expira: `{fecha_expiracion}`\n🔌 Conexiones: `{conexiones}`",
+            f"✅ Usuario SSH creado:\n\n"
+            f"👤 Usuario: `{usuario}`\n"
+            f"🔑 Contraseña: `{password}`\n"
+            f"📅 Expira: `{fecha_expiracion}`\n"
+            f"🔌 Conexiones: `{conexiones}`",
             parse_mode='Markdown'
         )
     except Exception as e:
