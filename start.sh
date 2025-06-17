@@ -20,19 +20,26 @@ if [ -d "$REPO_DIR" ]; then
   read -p "¿Deseas eliminarla y volver a clonar el repositorio? (s/n): " confirm
   if [[ "$confirm" == "s" || "$confirm" == "S" ]]; then
     rm -rf "$REPO_DIR"
+    echo -e "\n📥 Clonando el repositorio nuevamente..."
+    git clone https://github.com/ChristopherAGT/telegram-bot.git
   else
-    echo "❌ Abortando instalación para evitar conflictos."
-    exit 1
+    echo -e "\n⚙️ Actualizando repositorio existente..."
+    cd "$REPO_DIR"
+    git pull
+    cd ..
   fi
+else
+  echo -e "\n📥 Clonando el repositorio..."
+  git clone https://github.com/ChristopherAGT/telegram-bot.git
 fi
 
-echo -e "\n📥 Clonando el repositorio..."
-git clone https://github.com/ChristopherAGT/telegram-bot.git
 cd "$REPO_DIR"
 
 echo -e "\n📦 Instalando dependencias..."
-pip3 install --upgrade --force-reinstall python-telegram-bot==22.1
+pip3 install --upgrade pip
+pip3 install --force-reinstall python-telegram-bot==22.1
 pip3 install -r requirements.txt
+pip3 install python-dotenv
 
 echo -e "\n🛠️ Solicitando datos necesarios para enlazar el bot:\n"
 read -p "🔑 Ingresa tu TOKEN del bot de Telegram: " BOT_TOKEN
