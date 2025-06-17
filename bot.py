@@ -6,12 +6,11 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# 🔐 Carga variables desde .env
-load_dotenv()
+load_dotenv()  # Carga variables desde .env
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [int(os.getenv("ADMIN_ID"))]
 
-# Configura el log
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -33,7 +32,10 @@ async def crear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         args = context.args
         if len(args) != 4:
-            await update.message.reply_text("❗ Uso correcto: `/crear usuario contraseña días conexiones`", parse_mode='Markdown')
+            await update.message.reply_text(
+                "❗ Uso correcto: `/crear usuario contraseña días conexiones`",
+                parse_mode='Markdown'
+            )
             return
 
         usuario = args[0]
@@ -42,6 +44,7 @@ async def crear(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conexiones = int(args[3])
         fecha_expiracion = (datetime.now() + timedelta(days=dias)).strftime("%Y-%m-%d")
 
+        # Crear usuario SSH en el sistema
         subprocess.run(["useradd", "-e", fecha_expiracion, "-M", "-s", "/bin/false", usuario])
         subprocess.run(f"echo '{usuario}:{password}' | chpasswd", shell=True)
         subprocess.run(f"echo 'MaxSessions {conexiones}' >> /etc/ssh/sshd_config", shell=True)
